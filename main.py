@@ -16,11 +16,9 @@ def hash_password(password):
 def check_password(password, hashed):
     return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
 
-# Initialize session state for form toggle
 if 'show_register' not in st.session_state:
     st.session_state.show_register = False
 
-# Initialize session state for form data
 if 'register_data' not in st.session_state:
     st.session_state.register_data = {
         'new_username': '',
