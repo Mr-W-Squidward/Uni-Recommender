@@ -14,7 +14,7 @@ users_collection = db['users']
 course_collection = db['user_courses']
 recommended_collection = db['recommended_programs']
 
-# Password encryption and stuff
+# Password encryption
 def hash_password(password):
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
@@ -39,31 +39,47 @@ def load_required_courses():
     return pd.read_csv('.\HawkHacksDBV2 - Sheet1.csv')
 
 # Image base64
-def get_image_base64(image_path):
-    if not os.path.exists(image_path):
-        st.error(f"Image file not found: {image_path}")
-        return ""
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode()
+def get_image_base64(image_paths):
+    base64_images = []
+    for image_path in image_paths:
+        if not os.path.exists(image_path):
+            st.error(f"Image file not found: {image_path}")
+        else:
+            with open(image_path, "rb") as image_file:
+                base64_images.append(base64.b64encode(image_file.read()).decode())
+    return base64_images
 
-# Image path for each university
+# Image paths for each university
 def image_path(university):
     base_path = os.path.join(os.path.expanduser('~'), 'streamlitthing', 'imagess')
-    if university == "Wilfrid Laurier University Waterloo":
-        return os.path.join(base_path, "laurier.png")
-    elif university == "Toronto Metropolitan University":
-        return os.path.join(base_path, "tmu.jpeg")
-    elif university == "Wilfrid Laurier University (Brantford)":
-        return os.path.join(base_path, "laurierb.jpg")
-    elif university == "University of Waterloo":
-        return os.path.join(base_path, "waterloo.jpg")
-    elif university == "University of Toronto (St. George)":
-        return os.path.join(base_path, "uoft.jpg")
+    image_files = {
+        "Wilfrid Laurier University Waterloo": ["laurier1.png", "laurier2.jpg", "laurier3.jpg"],
+        "Toronto Metropolitan University": ["tmu1.jpg", "tmu2.jpg", "tmu3.jpg"],
+        "Wilfrid Laurier University (Brantford)": ["laurierb1.jpg", "laurierb2.jpg", "laurierb3.jpg"],
+        "University of Waterloo": ["waterloo1.jpg", "waterloo2.png", "waterloo3.jpg"],
+        "University of Toronto (St. George)": ["uoft1.jpg", "uoft2.jpg", "uoft3.jpg"],
+    }
+    return [os.path.join(base_path, img) for img in image_files.get(university, ["laurier1.png"])]
+
+def initialize_image_index(university):
+    if f'{university}_image_index' not in st.session_state:
+        st.session_state[f'{university}_image_index'] = 0
+
+def get_university_images(university):
+    initialize_image_index(university)
+    image_list = image_path(university)
+    current_index = st.session_state[f'{university}_image_index']
+    return image_list, current_index
+
+def change_image_index(university, direction):
+    image_list, current_index = get_university_images(university)
+    if direction == "next":
+        st.session_state[f'{university}_image_index'] = (current_index + 1) % len(image_list)
     else:
-        return os.path.join(base_path, "laurier.png")
+        st.session_state[f'{university}_image_index'] = (current_index - 1) % len(image_list)
 
 st.set_page_config(
-    page_title="Uni Recommender",
+    page_title="University Matcher",
     page_icon=":shark:",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -121,8 +137,10 @@ def calculate_recommended_programs():
                 recommended_collection.insert_one(program_data)
             else:
                 st.error("Invalid data format for recommended program.")
+        st.session_state.recommended_programs_stored = True
         st.write("Recommended Programs stored successfully.")
     else:
+        st.session_state.recommended_programs_stored = False
         st.error("You do not meet the required courses criteria or no programs found.")
 
 # Logout
@@ -160,36 +178,37 @@ if st.session_state.logged_in:
             course_collection.insert_one({'username': st.session_state.current_user, 'course_code': course_code, 'grade': grade})
             st.session_state.available_courses.remove(course_code)
             st.success(f"Successfully added course: {course_code} with grade: {grade}%")
-            st.experimental_rerun()  # Refresh the page to update the list of courses
+            st.experimental_rerun()  # Refresh the page after adding a course
+        else:
+            st.error("Please enter a valid grade between 0 and 100.")
+
+    st.subheader("Courses Entered:")
 
     courses_from_db = list(course_collection.find({'username': st.session_state.current_user}))
-    if courses_from_db:
-        st.write("Added Courses: ")
-        # Filter out any entries where 'course_code' is None
-        filtered_courses_from_db = [course for course in courses_from_db if course.get('course_code') is not None]
-        # Sort the filtered courses based on 'course_code'
-        courses_from_db_sorted = sorted(filtered_courses_from_db, key=lambda x: x['course_code'])
-        for index, course in enumerate(courses_from_db_sorted):
-            col1, col2, col3 = st.columns([1, 2, 1])
-            with col1:
-                st.write(course['course_code'])
-            with col2:
-                st.write(course['grade'], '%')
-            with col3:
-                remove_button_key = f"remove_button_{index}"
-                if st.button(f"Remove {course['course_code']}", key=remove_button_key):
-                    st.session_state.available_courses.add(course['course_code'])
-                    course_collection.delete_one({'_id': course['_id']})
-                    st.experimental_rerun()
+    filtered_courses_from_db = [course for course in courses_from_db if course.get('course_code') is not None]
+    courses_from_db_sorted = sorted(filtered_courses_from_db, key=lambda x: x['course_code'])
 
-        if st.button("Find Programs"):
-            calculate_recommended_programs()
+    for index, course in enumerate(courses_from_db_sorted):
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col1:
+            st.write(course['course_code'])
+        with col2:
+            st.write(course['grade'], '%')
+        with col3:
+            remove_button_key = f"remove_button_{index}"
+            if st.button(f"Remove {course['course_code']}", key=remove_button_key):
+                st.session_state.available_courses.add(course['course_code'])
+                course_collection.delete_one({'_id': course['_id']})
+                st.experimental_rerun()
 
-        # Display recommended programs
+    if st.button("Find Programs"):
+        calculate_recommended_programs()
+
+    # Display recommended programs only if found
+    if 'recommended_programs_stored' in st.session_state and st.session_state.recommended_programs_stored:
         st.subheader("Recommended Programs:")
         recommended_programs = list(recommended_collection.find({'username': st.session_state.current_user}))
         if recommended_programs:
-            # Group recommended programs by university
             grouped_programs = {}
             for program in recommended_programs:
                 university = program['university']
@@ -197,20 +216,29 @@ if st.session_state.logged_in:
                     grouped_programs[university] = []
                 grouped_programs[university].append(program)
 
-            # Display each university and its programs
             for university, programs in grouped_programs.items():
                 st.write(f"**{university}**")
-                program_image_path = image_path(university)
-                program_image_base64 = get_image_base64(program_image_path)
+                program_image_paths = image_path(university)
+                program_image_base64 = get_image_base64(program_image_paths)
+
                 if program_image_base64:
-                    st.image(f"data:image/png;base64,{program_image_base64}", width=100)
+                    initialize_image_index(university)
+                    current_index = st.session_state[f'{university}_image_index']
+                    image_url = f"data:image/png;base64,{program_image_base64[current_index]}"
+                    st.image(image_url, use_column_width=True)
+                    col1, col2 = st.columns([1, 1])
+                    with col1:
+                        if st.button("Previous", key=f"prev_{university}"):
+                            change_image_index(university, "prev")
+                            st.experimental_rerun()
+                    with col2:
+                        if st.button("Next", key=f"next_{university}"):
+                            change_image_index(university, "next")
+                            st.experimental_rerun()
 
                 for program in programs:
                     st.write(f"{program['degree']} - {program['program']} (Min Grade: {int(program['minimum_grade'] * 100)}%)")
-
-        else:
-            st.write("No recommended programs found.")
-
+        
 else:
     if st.session_state.show_register:
         st.sidebar.header("Create a New Account")
