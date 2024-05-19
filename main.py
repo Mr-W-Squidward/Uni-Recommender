@@ -58,6 +58,10 @@ def image_path(university):
         "Wilfrid Laurier University (Brantford)": ["laurierb1.jpg", "laurierb2.jpg", "laurierb3.jpg"],
         "University of Waterloo": ["waterloo1.jpg", "waterloo2.png", "waterloo3.jpg"],
         "University of Toronto (St. George)": ["uoft1.jpg", "uoft2.jpg", "uoft3.jpg"],
+        "University of Toronto (Missisauga)": ["miss1.png", "miss2.png", "miss3.png"],
+        "York University": ["york1.jpeg", "york2.jpeg", "york3.jpeg"],
+        "Western University": ["western1.jpeg", "western2.jpeg", "western3.jpeg"],
+        "University of Toronto (Scarborough)": ["scarb1.png", "scarb2.png", "scarb3.png"]
     }
     return [os.path.join(base_path, img) for img in image_files.get(university, ["laurier1.png"])]
 
