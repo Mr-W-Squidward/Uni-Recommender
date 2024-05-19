@@ -2,7 +2,7 @@ import pandas as pd
 
 def get_recommended_programs(user_courses):
     # Load the CSV file
-    df = pd.read_csv('./dbtransfer/hawk sack - Sheet1.csv')
+    df = pd.read_csv('./HawkHacksDBV2 - Sheet1.csv')
 
     # Filter only relevant columns (from column 4 onwards) and the 'Minimum Grade' column
     course_columns = df.columns[3:47]
@@ -29,4 +29,4 @@ def get_recommended_programs(user_courses):
                 'Minimum Grade': min_grade
             })
 
-    return pd.DataFrame(recommended_programs)
+    return recommended_programs

@@ -1,16 +1,17 @@
 import streamlit as st
 import bcrypt
 from pymongo import MongoClient
-import subprocess
 import pickle
 import pandas as pd
-import datapuller  # Assuming datapuller is a module you've created for program recommendations
+import datapuller
+import random
 
 # MongoDB setup
 client = MongoClient('mongodb://localhost:27017/')
 db = client['university_courses']
 users_collection = db['users']
 course_collection = db['user_courses']
+recommended_collection = db['recommended_programs']
 
 st.set_page_config(
     page_title="Uni Recommender",
@@ -53,7 +54,6 @@ def toggle_forms():
             'new_password_confirm': ''
         }
 
-# Logout function
 def logout():
     st.session_state.logged_in = False
     st.session_state.current_user = None
@@ -63,13 +63,43 @@ def save_course_data(course_data):
     with open('course_data.pkl', 'wb') as file:
         pickle.dump(course_data, file)
 
-# Load required courses from CSV
 def load_required_courses():
-    return pd.read_csv('.\dbtransfer\hawk sack - Sheet1.csv')
+    return pd.read_csv('.\HawkHacksDBV2 - Sheet1.csv')
 
 required_courses_df = load_required_courses()
 course_codes = required_courses_df.columns[3:47].tolist()
 required_courses_set = set(course_codes)
+
+# Function to recalculate recommended programs
+def calculate_recommended_programs():
+    courses_from_db = list(course_collection.find({'username': st.session_state.current_user}))
+
+    st.session_state.course_data = {course['course_code']: course['grade'] for course in courses_from_db}
+
+    save_course_data(st.session_state.course_data)
+
+    # Compare entered courses with required courses and find recommended programs
+    recommended_programs = datapuller.get_recommended_programs(st.session_state.course_data)
+    random.shuffle(recommended_programs)
+    
+    if recommended_programs is not None and len(recommended_programs) > 0:
+        recommended_collection.delete_many({'username': st.session_state.current_user})
+        
+        for program in recommended_programs:
+            if isinstance(program, dict):
+                program_data = {
+                    'username': st.session_state.current_user,
+                    'university': program.get('University'),
+                    'degree': program.get('Degree'),
+                    'program': program.get('Program'),
+                    'minimum_grade': program.get('Minimum Grade')
+                }
+                recommended_collection.insert_one(program_data)
+            else:
+                st.error("Invalid data format for recommended program.")
+        st.write("Recommended Programs stored successfully.")
+    else:
+        st.error("You do not meet the required courses criteria or no programs found.")
 
 # Logout
 if st.session_state.logged_in:
@@ -87,7 +117,9 @@ if st.session_state.logged_in:
             "TPJ4M", "TMJ4M", "TDJ4M", "TGJ4M", "TEJ4M", "THJ4M"
         }
 
-    sorted_courses = sorted(st.session_state.available_courses)  # Sort available courses alphabetically
+    # Get rid of None values before sorting
+    filtered_courses = [course for course in st.session_state.available_courses if course is not None]
+    sorted_courses = sorted(filtered_courses)  # Sort courses alphabetically
 
     with st.form(key='course_form'):
         course_code = st.selectbox('Course Code', sorted_courses)
@@ -109,7 +141,9 @@ if st.session_state.logged_in:
     courses_from_db = list(course_collection.find({'username': st.session_state.current_user}))
     if courses_from_db:
         st.write("Added Courses: ")
-        courses_from_db_sorted = sorted(courses_from_db, key=lambda x: x['course_code']) 
+        # Filter out any entries where 'course_code' is None
+        filtered_courses_from_db = [course for course in courses_from_db if course['course_code'] is not None]
+        courses_from_db_sorted = sorted(filtered_courses_from_db, key=lambda x: x['course_code'])
         for index, course in enumerate(courses_from_db_sorted):
             col1, col2, col3 = st.columns([1, 2, 1])
             with col1:
@@ -124,21 +158,17 @@ if st.session_state.logged_in:
                     st.experimental_rerun()
 
         if st.button("Find Programs"):
-            courses_from_db = list(course_collection.find({'username': st.session_state.current_user}))
-            if courses_from_db:
-                for course in courses_from_db:
-                    print(f"{course['course_code']}, {course['grade']}")
+          calculate_recommended_programs()
 
-            save_course_data(st.session_state.course_data)
+        # Display recommended programs
+        st.subheader("Recommended Programs:")
+        recommended_programs = list(recommended_collection.find({'username': st.session_state.current_user}))
+        if recommended_programs:
+            for program in recommended_programs:
+                st.write(f"{program['university']} - {program['degree']} - {program['program']} (Min Grade: {int(program['minimum_grade'] * 100)}%)")
+        else:
+            st.write("No recommended programs found.")
 
-            # Compare entered courses with required courses and find recommended programs
-            recommended_programs = datapuller.get_recommended_programs(st.session_state.course_data)
-            
-            if recommended_programs is None:
-                st.error("You do not meet the required courses criteria.")
-            else:
-                st.write("Recommended Programs: ")
-                st.table(recommended_programs)
 
 else:
     if st.session_state.show_register:
