@@ -4,7 +4,7 @@ import os
 import base64
 
 
-base_path = os.path.join(os.path.expanduser('~'), 'Downloads', 'project', 'imagess')
+base_path = os.path.join(os.path.expanduser('~'), 'Downloads', 'hawkhack24unidatabase-1', 'imagess')
 
 
 def get_image_base64(image_path):
