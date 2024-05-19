@@ -2,6 +2,5 @@ streamlit
 bcrypt
 pymongo
 pandas
-base64
 os
 random
