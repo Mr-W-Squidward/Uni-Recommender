@@ -104,13 +104,13 @@ if 'current_user' not in st.session_state:
     st.session_state.current_user = None
 
 if 'available_courses' not in st.session_state:
-    st.session_state.available_courses = set([
+    st.session_state.available_courses = {
         "MCV4U", "MHF4U", "MDM4U", "SPH4U", "SCH4U", "SBI4U", "ENG4U", "EWC4U", "AMU4M", "AVI4M",
         "ATC4M", "ADA4M", "ASM4M", "BAT4M", "BBM4M", "BOH4M", "CGW4U", "CGU4M", "CGR4M", "CGO4M",
         "CHI4U", "CHY4U", "CIA4U", "CLN4U", "CPW4U", "LVV4U", "ICS4U", "FSF4U", "FEF4U", "FIF4U",
         "PLF4M", "PSK4U", "HZT4U", "HSB4U", "HFA4U", "HHS4U", "HHG4M", "HNB4M", "HSE4M", "HSC4M",
         "TPJ4M", "TMJ4M", "TDJ4M", "TGJ4M", "TEJ4M", "THJ4M"
-    ])
+    }
 
 # Recalculate recommended programs
 def calculate_recommended_programs():
