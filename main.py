@@ -4,6 +4,8 @@ from pymongo import MongoClient
 import pandas as pd
 import datapuller
 import random
+import os
+import base64
 
 # MongoDB setup
 client = MongoClient('mongodb://localhost:27017/')
@@ -11,6 +13,54 @@ db = client['university_courses']
 users_collection = db['users']
 course_collection = db['user_courses']
 recommended_collection = db['recommended_programs']
+
+# Password encryption and stuff
+def hash_password(password):
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def check_password(password, hashed):
+    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+
+# Function to toggle forms
+def toggle_forms():
+    st.session_state.show_register = not st.session_state.show_register
+    if st.session_state.show_register:
+        st.session_state.register_data = {
+            'new_username': '',
+            'new_password': '',
+            'new_password_confirm': ''
+        }
+
+def logout():
+    st.session_state.logged_in = False
+    st.session_state.current_user = None
+
+def load_required_courses():
+    return pd.read_csv('.\HawkHacksDBV2 - Sheet1.csv')
+
+# Image base64
+def get_image_base64(image_path):
+    if not os.path.exists(image_path):
+        st.error(f"Image file not found: {image_path}")
+        return ""
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode()
+
+# Image path for each university
+def image_path(university):
+    base_path = os.path.join(os.path.expanduser('~'), 'streamlitthing', 'imagess')
+    if university == "Wilfrid Laurier University Waterloo":
+        return os.path.join(base_path, "laurier.png")
+    elif university == "Toronto Metropolitan University":
+        return os.path.join(base_path, "tmu.jpeg")
+    elif university == "Wilfrid Laurier University (Brantford)":
+        return os.path.join(base_path, "laurierb.jpg")
+    elif university == "University of Waterloo":
+        return os.path.join(base_path, "waterloo.jpg")
+    elif university == "University of Toronto (St. George)":
+        return os.path.join(base_path, "uoft.jpg")
+    else:
+        return os.path.join(base_path, "laurier.png")
 
 st.set_page_config(
     page_title="Uni Recommender",
@@ -20,12 +70,6 @@ st.set_page_config(
 )
 
 st.title("University Matcher")
-
-def hash_password(password):
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-
-def check_password(password, hashed):
-    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
 
 if 'show_register' not in st.session_state:
     st.session_state.show_register = False
@@ -43,28 +87,16 @@ if 'logged_in' not in st.session_state:
 if 'current_user' not in st.session_state:
     st.session_state.current_user = None
 
-# Toggle form display
-def toggle_forms():
-    st.session_state.show_register = not st.session_state.show_register
-    if st.session_state.show_register:
-        st.session_state.register_data = {
-            'new_username': '',
-            'new_password': '',
-            'new_password_confirm': ''
-        }
+if 'available_courses' not in st.session_state:
+    st.session_state.available_courses = set([
+        "MCV4U", "MHF4U", "MDM4U", "SPH4U", "SCH4U", "SBI4U", "ENG4U", "EWC4U", "AMU4M", "AVI4M",
+        "ATC4M", "ADA4M", "ASM4M", "BAT4M", "BBM4M", "BOH4M", "CGW4U", "CGU4M", "CGR4M", "CGO4M",
+        "CHI4U", "CHY4U", "CIA4U", "CLN4U", "CPW4U", "LVV4U", "ICS4U", "FSF4U", "FEF4U", "FIF4U",
+        "PLF4M", "PSK4U", "HZT4U", "HSB4U", "HFA4U", "HHS4U", "HHG4M", "HNB4M", "HSE4M", "HSC4M",
+        "TPJ4M", "TMJ4M", "TDJ4M", "TGJ4M", "TEJ4M", "THJ4M"
+    ])
 
-def logout():
-    st.session_state.logged_in = False
-    st.session_state.current_user = None
-
-def load_required_courses():
-    return pd.read_csv('.\HawkHacksDBV2 - Sheet1.csv')
-
-required_courses_df = load_required_courses()
-course_codes = required_courses_df.columns[3:47].tolist()
-required_courses_set = set(course_codes)
-
-# Function to recalculate recommended programs
+# Recalculate recommended programs
 def calculate_recommended_programs():
     courses_from_db = list(course_collection.find({'username': st.session_state.current_user}))
 
@@ -101,13 +133,13 @@ if st.session_state.logged_in:
         st.experimental_rerun()
 
     if 'available_courses' not in st.session_state:
-        st.session_state.available_courses = {
+        st.session_state.available_courses = set([
             "MCV4U", "MHF4U", "MDM4U", "SPH4U", "SCH4U", "SBI4U", "ENG4U", "EWC4U", "AMU4M", "AVI4M",
             "ATC4M", "ADA4M", "ASM4M", "BAT4M", "BBM4M", "BOH4M", "CGW4U", "CGU4M", "CGR4M", "CGO4M",
             "CHI4U", "CHY4U", "CIA4U", "CLN4U", "CPW4U", "LVV4U", "ICS4U", "FSF4U", "FEF4U", "FIF4U",
             "PLF4M", "PSK4U", "HZT4U", "HSB4U", "HFA4U", "HHS4U", "HHG4M", "HNB4M", "HSE4M", "HSC4M",
             "TPJ4M", "TMJ4M", "TDJ4M", "TGJ4M", "TEJ4M", "THJ4M"
-        }
+        ])
 
     # Get rid of None values before sorting
     filtered_courses = [course for course in st.session_state.available_courses if course is not None]
@@ -134,7 +166,8 @@ if st.session_state.logged_in:
     if courses_from_db:
         st.write("Added Courses: ")
         # Filter out any entries where 'course_code' is None
-        filtered_courses_from_db = [course for course in courses_from_db if course['course_code'] is not None]
+        filtered_courses_from_db = [course for course in courses_from_db if course.get('course_code') is not None]
+        # Sort the filtered courses based on 'course_code'
         courses_from_db_sorted = sorted(filtered_courses_from_db, key=lambda x: x['course_code'])
         for index, course in enumerate(courses_from_db_sorted):
             col1, col2, col3 = st.columns([1, 2, 1])
@@ -150,17 +183,33 @@ if st.session_state.logged_in:
                     st.experimental_rerun()
 
         if st.button("Find Programs"):
-          calculate_recommended_programs()
+            calculate_recommended_programs()
 
         # Display recommended programs
         st.subheader("Recommended Programs:")
         recommended_programs = list(recommended_collection.find({'username': st.session_state.current_user}))
         if recommended_programs:
+            # Group recommended programs by university
+            grouped_programs = {}
             for program in recommended_programs:
-                st.write(f"{program['university']} - {program['degree']} - {program['program']} (Min Grade: {int(program['minimum_grade'] * 100)}%)")
+                university = program['university']
+                if university not in grouped_programs:
+                    grouped_programs[university] = []
+                grouped_programs[university].append(program)
+
+            # Display each university and its programs
+            for university, programs in grouped_programs.items():
+                st.write(f"**{university}**")
+                program_image_path = image_path(university)
+                program_image_base64 = get_image_base64(program_image_path)
+                if program_image_base64:
+                    st.image(f"data:image/png;base64,{program_image_base64}", width=100)
+
+                for program in programs:
+                    st.write(f"{program['degree']} - {program['program']} (Min Grade: {int(program['minimum_grade'] * 100)}%)")
+
         else:
             st.write("No recommended programs found.")
-
 
 else:
     if st.session_state.show_register:
