@@ -1,7 +1,6 @@
 import streamlit as st
 import bcrypt
 from pymongo import MongoClient
-import pickle
 import pandas as pd
 import datapuller
 import random
@@ -58,11 +57,6 @@ def logout():
     st.session_state.logged_in = False
     st.session_state.current_user = None
 
-# Save the dictionary to a file
-def save_course_data(course_data):
-    with open('course_data.pkl', 'wb') as file:
-        pickle.dump(course_data, file)
-
 def load_required_courses():
     return pd.read_csv('.\HawkHacksDBV2 - Sheet1.csv')
 
@@ -75,8 +69,6 @@ def calculate_recommended_programs():
     courses_from_db = list(course_collection.find({'username': st.session_state.current_user}))
 
     st.session_state.course_data = {course['course_code']: course['grade'] for course in courses_from_db}
-
-    save_course_data(st.session_state.course_data)
 
     # Compare entered courses with required courses and find recommended programs
     recommended_programs = datapuller.get_recommended_programs(st.session_state.course_data)
